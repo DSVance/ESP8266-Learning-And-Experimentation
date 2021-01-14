@@ -26,8 +26,8 @@
 
 bool        WiFiConnected = false;
 
-const int   NTPOffset = 6 * 60 * 60;            // Offset from UTC time in seconds.
-const int   NTPInterval = 1 * 60 * 1000;        // Update interval In miliseconds.
+const int   NTPOffset = -6 * 60 * 60;            // Offset from UTC time in seconds.
+const int   NTPInterval = 2 * 60 * 1000;        // Update interval In miliseconds.
 const char* NTPServerName = "time.nist.gov";    // NTP server address.
 os_timer_t  NTPUpdateTimer;
 
@@ -150,6 +150,9 @@ static void UPdateTimeStamp( void* )
    delay ( 1000 );
    digitalWrite ( LED_BUILTIN, HIGH );
 
+   unsigned long Start = millis();
+   Serial.printf ( "Starting UPdateTimeStamp at %lu ... \n", Start );
+   
    if ( WiFiConnected == true )
    {
       // Update the recorded time through the NTP client.
@@ -176,11 +179,69 @@ static void UPdateTimeStamp( void* )
       // Subtract seventy years to get Unix time.
       unsigned long UnixTime = NTPTime - NTP2Unix;
 
+      String DayLabel;
+      switch ( NTPClienth.getDay() )
+      {
+         case 0:  DayLabel = "Sunday";    break;
+         case 1:  DayLabel = "Monday";    break;
+         case 2:  DayLabel = "Tuesday";   break;
+         case 3:  DayLabel = "Wednesday"; break;
+         case 4:  DayLabel = "Thursday";  break;
+         case 5:  DayLabel = "Friday";    break;
+         case 6:  DayLabel = "Saturday";  break;
+      }
+      
       // Print Unix time
       Serial.printf ( "(Unix) Seconds since Jan 1 1970 = %u \n", UnixTime );
 
       Serial.printf ( "Time stamp formatted by the NTP client: %s \n", NTPClienth.getFormattedTime().c_str() );
+      Serial.printf ( "Day of the week is %s \n", DayLabel.c_str() );
+      ShowDate ( NTPTime );
       Serial.printf ( "Updating time stamp in %lu seconds... \n\n", NTPInterval / 1000 );
    }
 }
 
+
+static void ShowDate( unsigned long TimeStamp )
+{
+   String MonthName[12] = 
+   { 
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December" 
+   };
+
+   String DayName[7] = 
+   { 
+      "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" 
+   };
+
+   // -------- ---- -----------------------------------
+   // Member   Type  Meaning                    Range
+   // -------- ---- -----------------------------------
+   // tm_sec   int   seconds after the minute   0-61
+   // tm_min   int   minutes after the hour     0-59
+   // tm_hour  int   hours since midnight       0-23
+   // tm_mday  int   day of the month           1-31
+   // tm_mon   int   months since January       0-11
+   // tm_year  int   years since 1900  
+   // tm_wday  int   days since Sunday          0-6
+   // tm_yday  int   days since January 1       0-365
+   // tm_isdst int   Daylight Saving Time flag
+   // -------------------------------------------------
+   // NOTE: tm_sec value is generally 0-59. The extra 
+   // range is to accommodate for leap seconds.
+   
+   struct tm* TimeNow = gmtime ( (time_t*) &TimeStamp ); 
+
+   Serial.printf ( "Month day: %d \n", TimeNow->tm_mday );
+   Serial.printf ( "Month: %s (%d) \n", MonthName[ TimeNow->tm_mon ].c_str(), TimeNow->tm_mon + 1 );
+   Serial.printf ( "Year: %d \n", TimeNow->tm_year + 1900 );
+   Serial.printf ( "Current date: %s %d/%d/%d (%d) \n", 
+                   DayName[ TimeNow->tm_wday ].c_str(), 
+                   TimeNow->tm_mon + 1, 
+                   TimeNow->tm_mday, 
+                   TimeNow->tm_year + 1900,
+                   TimeNow->tm_yday + 1
+                 );
+   Serial.printf ( "Current time: %02d:%02d:%02d \n", TimeNow->tm_hour, TimeNow->tm_min, TimeNow->tm_sec );
+}
